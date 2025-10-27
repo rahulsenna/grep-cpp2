@@ -91,12 +91,13 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
 
   switch (result.n_char)
   {
-    case '+': result.quantifier = PLUS ; break;
-    case '*': result.quantifier = STAR; break;
-    case '?': result.quantifier = OPTIONAL; break;
-    case '|': result.quantifier = OR; break;
+    case '+': result.quantifier = PLUS ;    idx++; result.n_char = pattern[idx];  break;
+    case '*': result.quantifier = STAR;     idx++; result.n_char = pattern[idx];  break;
+    case '?': result.quantifier = OPTIONAL; idx++; result.n_char = pattern[idx];  break;
+    case '|': result.quantifier = OR;       idx++; result.n_char = pattern[idx];  break;
     default: break;
   }
+
   idx++;
   return result;
 };
@@ -169,10 +170,12 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx)
 
 bool match_pattern(const std::string &input_line, std::string pattern_text)
 {
+  bool anchor_beg = false;
   bool found_beg = false;
   if (pattern_text[0] == '^')
   {
     found_beg = true;
+    anchor_beg = true;
     pattern_text = pattern_text.substr(1);
   }
 
@@ -180,15 +183,25 @@ bool match_pattern(const std::string &input_line, std::string pattern_text)
   int pattern_len = patterns.size();
   int input_len = input_line.size();
   int i = 0, pi = 0;
+  int last_found_idx = 0;
   for (; i < input_len && pi < pattern_len;)
   {
     if (match_curr_pattern(patterns[pi], input_line, i))
-    { 
-    	found_beg = true;
+    {
+      if (!found_beg)
+        last_found_idx = i;
+      found_beg = true;
       pi++;
-    } else
+    }
+    else
     {
       if (found_beg)
+      {
+        i = last_found_idx + 1;
+        pi = 0;
+      }
+      found_beg = false;
+      if (anchor_beg)
         return false;
     }
   }
@@ -232,7 +245,7 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "pineapple_raspberry";
+  std::string input_line = "blueberry_raspberry";
 #endif
   try
   {
