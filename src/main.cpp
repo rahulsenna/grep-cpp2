@@ -55,6 +55,7 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
       case 'w': result.type = W_CHAR; break;
       default: break;
       }
+      result.n_char = pattern[idx + 1];
       break;
     }
     case '[':
@@ -113,26 +114,17 @@ std::vector<Pattern> parse_whole_pattern(std::string pattern)
 }
 bool match_single(Pattern pattern, char chr)
 {
-  if (pattern.type == CHAR)
+  if (pattern.type == CHAR && pattern.c_char != chr)
   {
-    if (pattern.c_char != chr && (pattern.quantifier != STAR || pattern.quantifier != OPTIONAL))
-    {
-      return false;
-    }
+    return false;
   }
-  else if (pattern.type == DIGIT)
+  else if (pattern.type == DIGIT && !isdigit(chr))
   {
-    if (!isdigit(chr))
-    {
-      return false;
-    }
+    return false;
   }
-  else if (pattern.type == W_CHAR)
+  else if (pattern.type == W_CHAR && !isalnum(chr) && chr != '_')
   {
-    if (!isalnum(chr) && chr != '_')
-    {
-      return false;
-    }
+    return false;
   }
   else if (pattern.type == CHAR_GROUP_POSITIVE)
   {
@@ -146,24 +138,23 @@ bool match_single(Pattern pattern, char chr)
   return true;
 }
 
-bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx)
+bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
 {
   char chr = input[idx++];
-  
-  if (!match_single(pattern, chr)) 
+
+  if (!match_single(pattern, chr) &&
+      !(pattern.type == CHAR && (pattern.quantifier == STAR || pattern.quantifier == OPTIONAL)))
   {
   	return false;
   }
   
-  if (pattern.quantifier == STAR && pattern.c_char == chr)
+  if ((pattern.quantifier == STAR || pattern.quantifier == PLUS))
   {
-    while (idx < input.length() && input[idx] == pattern.c_char)
+    while (idx < input.length() && match_single(pattern, input[idx]))
       idx++;
-  }
-  else if (pattern.quantifier == PLUS)
-  {
-    while (idx < input.length() && input[idx] == pattern.c_char)
-      idx++;
+
+    while (match_single(patterns[++pidx], chr))
+      idx--;
   }
   return true;
 }
@@ -186,7 +177,7 @@ bool match_pattern(const std::string &input_line, std::string pattern_text)
   int last_found_idx = 0;
   for (; i < input_len && pi < pattern_len;)
   {
-    if (match_curr_pattern(patterns[pi], input_line, i))
+    if (match_curr_pattern(patterns[pi], input_line, i, patterns, pi))
     {
       if (!found_beg)
         last_found_idx = i;
@@ -245,7 +236,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "blueberry_raspberry";
+  std::string input_line = "abc_123_xyz";
+  pattern = "^abc_\\d+_xyz$";
 #endif
   try
   {
