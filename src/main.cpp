@@ -142,13 +142,15 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std
 {
   char chr = input[idx++];
 
-  if (!match_single(pattern, chr) &&
-      !(pattern.type == CHAR && (pattern.quantifier == STAR || pattern.quantifier == OPTIONAL)))
+  if (!match_single(pattern, chr))
   {
-  	return false;
+    if ((pattern.type == CHAR && (pattern.quantifier == STAR || pattern.quantifier == OPTIONAL)))
+    	idx--;
+    else
+      return false;
   }
   
-  if ((pattern.quantifier == STAR || pattern.quantifier == PLUS))
+  if (pattern.quantifier == STAR || pattern.quantifier == PLUS)
   {
     while (idx < input.length() && match_single(pattern, input[idx]))
       idx++;
@@ -236,8 +238,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "abc_123_xyz";
-  pattern = "^abc_\\d+_xyz$";
+  std::string input_line = "act";
+  pattern = "ca?t";
 #endif
   try
   {
