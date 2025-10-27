@@ -167,12 +167,18 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx)
   return true;
 }
 
-bool match_pattern(const std::string &input_line, const std::string &pattern_text)
+bool match_pattern(const std::string &input_line, std::string pattern_text)
 {
+  bool found_beg = false;
+  if (pattern_text[0] == '^')
+  {
+    found_beg = true;
+    pattern_text = pattern_text.substr(1);
+  }
+
   auto patterns = parse_whole_pattern(pattern_text);
   int pattern_len = patterns.size();
   int input_len = input_line.size();
-  bool found_beg = false;
   int i = 0, pi = 0;
   for (; i < input_len && pi < pattern_len;)
   {
@@ -187,9 +193,12 @@ bool match_pattern(const std::string &input_line, const std::string &pattern_tex
     }
   }
   while (pi < pattern_len)
-  { 
-  	if (!(patterns[pi].quantifier == STAR || patterns[pi].quantifier == OPTIONAL))
-  		return false;
+  {
+    if (patterns[pi].c_char == '$' && i == input_len)
+      return found_beg;
+    if (!(patterns[pi].quantifier == STAR || patterns[pi].quantifier == OPTIONAL))
+      return false;
+    pi++;
   }
   return found_beg;
 }
@@ -223,7 +232,7 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "p";
+  std::string input_line = "pineapple_raspberry";
 #endif
   try
   {
