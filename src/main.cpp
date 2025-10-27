@@ -173,8 +173,8 @@ bool match_pattern(const std::string &input_line, const std::string &pattern_tex
   int pattern_len = patterns.size();
   int input_len = input_line.size();
   bool found_beg = false;
-
-  for (int i = 0, pi = 0; i < input_len && pi < pattern_len;)
+  int i = 0, pi = 0;
+  for (; i < input_len && pi < pattern_len;)
   {
     if (match_curr_pattern(patterns[pi], input_line, i))
     { 
@@ -185,6 +185,11 @@ bool match_pattern(const std::string &input_line, const std::string &pattern_tex
       if (found_beg)
         return false;
     }
+  }
+  while (pi < pattern_len)
+  { 
+  	if (!(patterns[pi].quantifier == STAR || patterns[pi].quantifier == OPTIONAL))
+  		return false;
   }
   return found_beg;
 }
