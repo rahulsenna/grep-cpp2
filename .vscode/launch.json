@@ -1,5 +1,19 @@
 {
     "version": "0.2.0",
-    "configurations": [],
+    "configurations": [
+        {
+            "name": "(lldb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/grep",
+            "args": ["-E", "\\w"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "build_grep"
+        }
+    ],
     "compounds": []
 }

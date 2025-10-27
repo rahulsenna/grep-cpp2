@@ -5,7 +5,7 @@
     "tasks": [
         {
             "type": "cppbuild",
-            "label": "build_server",
+            "label": "build_grep",
             "command": "cmake",
             "args": [
                 "--build",
@@ -61,7 +61,7 @@
             "command": "pkill",
             "args": [
                 "-9",
-                "exe"
+                "grep"
             ],
             "group": {
                 "kind": "build",
@@ -85,7 +85,7 @@
             "command": "pkill",
             "args": [
                 "-9",
-                "exe"
+                "grep"
             ],
             "group": {
                 "kind": "build",

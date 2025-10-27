@@ -1,16 +1,141 @@
 #include <iostream>
 #include <string>
+#include <vector>
 
-bool match_pattern(const std::string &input_line, const std::string &pattern)
+enum PatternType
 {
-  if (pattern.length() == 1)
+
+  CHAR = 0x0,
+  DIGIT,
+  W_CHAR,
+  PLUS,
+  STAR,
+  OPTIONAL,
+  OR,
+  BACK_REF,
+  NONE,
+  COUNT
+};
+
+typedef struct Pattern
+{
+  PatternType type;
+  PatternType quantifier;
+	char c_char;
+	char p_char;
+	char n_char;
+  std::vector<Pattern> group;
+} Pattern;
+
+Pattern parse_single_pattern(std::string pattern, int &idx)
+{
+  Pattern result = {};
+  result.type = CHAR;
+  result.quantifier = NONE;
+  result.c_char = pattern[idx];
+  result.n_char = 0;
+  result.p_char = 0;
+  if (idx - 1 >= 0)
+    result.p_char = pattern[idx - 1];
+  if (idx + 1 < pattern.length())
+    result.n_char = pattern[idx + 1];
+
+  switch (result.c_char)
   {
-    return input_line.find(pattern) != std::string::npos;
+    case '\\': 
+    {
+      idx++;
+      switch (pattern[idx])
+      {
+      case 'd': result.type = DIGIT; break;
+      case 'w': result.type = W_CHAR; break;
+      default: break;
+      }
+      break;
+    }
+    default: break;
   }
-  else
+
+  switch (result.n_char)
   {
-    throw std::runtime_error("Unhandled pattern " + pattern);
+    case '+': result.quantifier = PLUS ; break;
+    case '*': result.quantifier = STAR; break;
+    case '?': result.quantifier = OPTIONAL; break;
+    case '|': result.quantifier = OR; break;
+    default: break;
   }
+  idx++;
+  return result;
+};
+
+std::vector<Pattern> parse_whole_pattern(std::string pattern)
+{
+  std::vector<Pattern> res;
+  for (int i = 0; i < pattern.length();)
+  {
+    res.push_back(parse_single_pattern(pattern, i));
+  }
+  return res;
+}
+bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx)
+{
+  char chr = input[idx++];
+  if (pattern.type == CHAR)
+  {
+    if (pattern.c_char != chr && (pattern.quantifier != STAR || pattern.quantifier != OPTIONAL))
+    {
+      return false;
+    }
+  }
+  else if (pattern.type == DIGIT)
+  {
+    if (!isdigit(chr))
+    {
+      return false;
+    }
+  }
+  else if (pattern.type == W_CHAR)
+  {
+    if (!isalnum(chr) && chr != '_')
+    {
+      return false;
+    }
+  }
+
+  
+  if (pattern.quantifier == STAR)
+  {
+    while (idx < input.length() && input[idx] != pattern.n_char)
+      idx++;
+  }
+  else if (pattern.quantifier == PLUS)
+  {
+    while (idx < input.length() && input[idx] == pattern.c_char)
+      idx++;
+  }
+  return true;
+}
+
+bool match_pattern(const std::string &input_line, const std::string &pattern_text)
+{
+  auto patterns = parse_whole_pattern(pattern_text);
+  int pattern_len = patterns.size();
+  int input_len = input_line.size();
+  bool found_beg = false;
+
+  for (int i = 0, pi = 0; i < input_len && pi < pattern_len;)
+  {
+    if (match_curr_pattern(patterns[pi], input_line, i))
+    { 
+    	found_beg = true;
+      pi++;
+    } else
+    {
+      if (found_beg)
+        return false;
+    }
+  }
+  return found_beg;
 }
 
 int main(int argc, char *argv[])
@@ -38,10 +163,12 @@ int main(int argc, char *argv[])
   }
 
 
-
+#if 1 // DEBUG
   std::string input_line;
   std::getline(std::cin, input_line);
-
+#else
+  std::string input_line = "436";
+#endif
   try
   {
     if (match_pattern(input_line, pattern))
