@@ -34,7 +34,7 @@
         
         {
             "type": "shell",
-            "label": "codecrafter test",
+            "label": "codecrafter",
             "command": "make",
             "args": [
                 "test_all"
@@ -57,7 +57,7 @@
         },
         {
             "type": "shell",
-            "label": "codecrafter test2",
+            "label": "codecrafter test",
             "command": "pkill",
             "args": [
                 "-9",

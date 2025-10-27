@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <sstream>
 
 enum PatternType
 {
@@ -12,6 +13,8 @@ enum PatternType
   STAR,
   OPTIONAL,
   OR,
+  CHAR_GROUP_POSITIVE,
+  CHAR_GROUP_NEGATIVE,
   BACK_REF,
   NONE,
   COUNT
@@ -25,6 +28,7 @@ typedef struct Pattern
 	char p_char;
 	char n_char;
   std::vector<Pattern> group;
+  std::string char_group;
 } Pattern;
 
 Pattern parse_single_pattern(std::string pattern, int &idx)
@@ -53,6 +57,35 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
       }
       break;
     }
+    case '[':
+    {
+      result.type = CHAR_GROUP_POSITIVE;
+      idx++;
+      if (pattern[idx] == '^')
+      { 
+      	result.type = CHAR_GROUP_NEGATIVE;
+        idx++;
+      }
+      std::ostringstream ss;
+      char prev = 0;
+      while(pattern[idx] != ']')
+      {
+        if (pattern[idx] == '-' && prev != 0)
+        {
+          idx++;
+          while(prev < pattern[idx])
+          {
+            ss << prev;
+            prev++;
+          }
+        }
+        prev = pattern[idx];
+        ss << prev;
+        idx++;
+      }
+      result.char_group = ss.str();
+    }
+
     default: break;
   }
 
@@ -77,9 +110,8 @@ std::vector<Pattern> parse_whole_pattern(std::string pattern)
   }
   return res;
 }
-bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx)
+bool match_single(Pattern pattern, char chr)
 {
-  char chr = input[idx++];
   if (pattern.type == CHAR)
   {
     if (pattern.c_char != chr && (pattern.quantifier != STAR || pattern.quantifier != OPTIONAL))
@@ -101,11 +133,30 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx)
       return false;
     }
   }
-
-  
-  if (pattern.quantifier == STAR)
+  else if (pattern.type == CHAR_GROUP_POSITIVE)
   {
-    while (idx < input.length() && input[idx] != pattern.n_char)
+    return pattern.char_group.contains(chr);
+  }
+  else if (pattern.type == CHAR_GROUP_NEGATIVE)
+  {
+    return !pattern.char_group.contains(chr);
+  }
+
+  return true;
+}
+
+bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx)
+{
+  char chr = input[idx++];
+  
+  if (!match_single(pattern, chr)) 
+  {
+  	return false;
+  }
+  
+  if (pattern.quantifier == STAR && pattern.c_char == chr)
+  {
+    while (idx < input.length() && input[idx] == pattern.c_char)
       idx++;
   }
   else if (pattern.quantifier == PLUS)
@@ -167,7 +218,7 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "436";
+  std::string input_line = "p";
 #endif
   try
   {

@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/grep",
-            "args": ["-E", "\\w"],
+            "args": ["-E", "[raspberry]"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
