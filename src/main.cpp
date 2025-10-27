@@ -15,6 +15,7 @@ enum PatternType
   OR,
   CHAR_GROUP_POSITIVE,
   CHAR_GROUP_NEGATIVE,
+  WILDCARD,
   BACK_REF,
   NONE,
   COUNT
@@ -85,18 +86,26 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
         idx++;
       }
       result.char_group = ss.str();
+      break;
     }
+    case '.': result.type = WILDCARD; break;
 
     default: break;
   }
 
   switch (result.n_char)
   {
-    case '+': result.quantifier = PLUS ;    idx++; result.n_char = pattern[idx];  break;
-    case '*': result.quantifier = STAR;     idx++; result.n_char = pattern[idx];  break;
-    case '?': result.quantifier = OPTIONAL; idx++; result.n_char = pattern[idx];  break;
-    case '|': result.quantifier = OR;       idx++; result.n_char = pattern[idx];  break;
+    case '+': result.quantifier = PLUS ;    idx++; result.n_char = pattern[idx+1];  break;
+    case '*': result.quantifier = STAR;     idx++; result.n_char = pattern[idx+1];  break;
+    case '?': result.quantifier = OPTIONAL; idx++; result.n_char = pattern[idx+1];  break;
+    case '|': result.quantifier = OR;       idx++; result.n_char = pattern[idx+1];  break;
     default: break;
+  }
+  if (result.quantifier == PLUS || result.quantifier == STAR)
+  {
+    int i = 2;
+    while (result.n_char == result.c_char && i + idx < pattern.length())
+      result.n_char = pattern[idx + i++];
   }
 
   idx++;
@@ -114,6 +123,9 @@ std::vector<Pattern> parse_whole_pattern(std::string pattern)
 }
 bool match_single(Pattern pattern, char chr)
 {
+  if (pattern.type == WILDCARD)
+    return true;
+
   if (pattern.type == CHAR && pattern.c_char != chr)
   {
     return false;
@@ -152,7 +164,8 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std
   
   if (pattern.quantifier == STAR || pattern.quantifier == PLUS)
   {
-    while (idx < input.length() && match_single(pattern, input[idx]))
+    std::cout << "pattern.n_char: " << pattern.n_char << '\n';
+    while (idx < input.length() && match_single(pattern, input[idx]) && pattern.n_char != input[idx])
       idx++;
 
     while (match_single(patterns[++pidx], chr))
