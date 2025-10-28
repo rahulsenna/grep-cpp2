@@ -16,6 +16,7 @@ enum PatternType
   CHAR_GROUP_POSITIVE,
   CHAR_GROUP_NEGATIVE,
   WILDCARD,
+  GROUP,
   BACK_REF,
   NONE,
   COUNT
@@ -88,6 +89,42 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
       result.char_group = ss.str();
       break;
     }
+    case '(':
+    {
+      result.type = GROUP;
+      idx++;
+      std::vector<Pattern> group;
+      bool alt = false;
+      while (pattern[idx] != ')')
+      {
+        auto pat = parse_single_pattern(pattern, idx);
+        group.push_back(pat);
+        if (pat.quantifier == OR)
+        {
+          alt = true;
+          Pattern alternate = {};
+          alternate.type = GROUP;
+          alternate.quantifier = OR;
+          alternate.group = group;
+          result.group.push_back(alternate);
+          group = {};
+        }
+      }
+      // idx++; // move past ')'
+      if (alt)
+      {
+        Pattern alternate = {};
+        alternate.type = GROUP;
+        alternate.quantifier = OR;
+        alternate.group = group;
+        result.group.push_back(alternate);
+      } else
+      {
+        for (auto e: group)
+          result.group.push_back(e);
+      }
+      break;
+    }
     case '.': result.type = WILDCARD; break;
 
     default: break;
@@ -149,9 +186,13 @@ bool match_single(Pattern pattern, char chr)
 
   return true;
 }
+bool match_group(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns);
 
 bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
 {
+  if (pattern.type == GROUP)
+    return match_group(pattern, input, idx, patterns);
+
   char chr = input[idx++];
 
   if (!match_single(pattern, chr))
@@ -164,12 +205,36 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std
   
   if (pattern.quantifier == STAR || pattern.quantifier == PLUS)
   {
-    std::cout << "pattern.n_char: " << pattern.n_char << '\n';
     while (idx < input.length() && match_single(pattern, input[idx]) && pattern.n_char != input[idx])
       idx++;
 
     while (match_single(patterns[++pidx], chr))
       idx--;
+  }
+  return true;
+}
+
+bool match_group(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns)
+{
+  int saved_idx = idx;
+  int pidx = 0;
+  for (int i = 0; i < pattern.group.size(); ++i)
+  {
+    auto p = pattern.group[i];
+    if (!match_curr_pattern(p, input, idx, pattern.group, pidx))
+    {
+      idx = saved_idx;
+      pidx = 0;
+      if (p.quantifier != OR || (i+1) >= pattern.group.size())
+        return false;
+    }
+    else
+    {
+      if (p.quantifier == OR)
+        return true;
+      pidx++;
+    }
+      
   }
   return true;
 }
@@ -251,8 +316,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "act";
-  pattern = "ca?t";
+  std::string input_line = "I see 1 cat";
+  pattern = "^I see \\d+ (cat|dog)s?$";
 #endif
   try
   {
