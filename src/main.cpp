@@ -166,7 +166,7 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
         else
           result.max_quant = pattern[idx] - '0';
       }
-      result.n_char = (idx + 2) < pattern.length() ? pattern[idx + 2] : 0;
+      result.n_char = (idx + 1) < pattern.length() ? pattern[idx + 1] : 0;
     }
     default: break;
   }
@@ -297,7 +297,7 @@ bool n_quantifier(Pattern pattern, const std::string &input, int &idx, std::vect
   dummy.quantifier = NONE;
 
   int matched_times = 0;
-  while (idx < input.length() && matched_times < pattern.max_quant)
+  while (idx < input.length() && matched_times < pattern.max_quant && pattern.n_char != input[idx])
   {
     if (match_curr_pattern(dummy, input, idx, pattern.group, pidx))
     {
@@ -389,8 +389,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "2021-10-24 11:27 blueberry";
-  pattern = "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} (blueberry|spinach)$";
+  std::string input_line = "13:29 LOG WARN device_registered";
+  pattern = "^\\d{2}:\\d{2} LOG \\w{3,} \\w+$";
 #endif
   try
   {
