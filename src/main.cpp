@@ -55,7 +55,13 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
       {
       case 'd': result.type = DIGIT; break;
       case 'w': result.type = W_CHAR; break;
-      default: break;
+      default:
+        if (isdigit(pattern[idx]))
+        {
+          result.type = BACK_REF;
+          result.c_char = pattern[idx] - '0';
+        }
+      break;
       }
       result.n_char = pattern[idx + 1];
       break;
@@ -87,6 +93,7 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
         idx++;
       }
       result.char_group = ss.str();
+      result.n_char = pattern[idx + 1];
       break;
     }
     case '(':
@@ -123,6 +130,7 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
         for (auto e: group)
           result.group.push_back(e);
       }
+      result.n_char = pattern[idx + 1];
       break;
     }
     case '.': result.type = WILDCARD; break;
@@ -147,7 +155,7 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
 
   idx++;
   return result;
-};
+}
 
 std::vector<Pattern> parse_whole_pattern(std::string pattern)
 {
@@ -158,33 +166,22 @@ std::vector<Pattern> parse_whole_pattern(std::string pattern)
   }
   return res;
 }
+
+std::vector<std::string> captures {""};
+
 bool match_single(Pattern pattern, char chr)
 {
-  if (pattern.type == WILDCARD)
-    return true;
-
-  if (pattern.type == CHAR && pattern.c_char != chr)
+  switch(pattern.type)
   {
-    return false;
+    case WILDCARD:            return true;
+    case CHAR:                return pattern.c_char == chr;
+    case DIGIT:               return isdigit(chr);
+    case W_CHAR:              return (isalnum(chr) || chr == '_');
+    case CHAR_GROUP_POSITIVE: return pattern.char_group.contains(chr);
+    case CHAR_GROUP_NEGATIVE: return !pattern.char_group.contains(chr);
+    default:                  return false;
   }
-  else if (pattern.type == DIGIT && !isdigit(chr))
-  {
-    return false;
-  }
-  else if (pattern.type == W_CHAR && !isalnum(chr) && chr != '_')
-  {
-    return false;
-  }
-  else if (pattern.type == CHAR_GROUP_POSITIVE)
-  {
-    return pattern.char_group.contains(chr);
-  }
-  else if (pattern.type == CHAR_GROUP_NEGATIVE)
-  {
-    return !pattern.char_group.contains(chr);
-  }
-
-  return true;
+  return false;
 }
 bool match_group(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns);
 
@@ -192,6 +189,24 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std
 {
   if (pattern.type == GROUP)
     return match_group(pattern, input, idx, patterns);
+  
+  else if (pattern.type == BACK_REF)
+  {
+    int capture_group_idx = pattern.c_char;
+    if (capture_group_idx > captures.size())
+      return false;
+    std::string group = captures[capture_group_idx];
+    int saved_idx = idx;
+    for (auto chr : group)
+    {
+      if (chr != input[idx++])
+      {
+        idx = saved_idx;
+        return false;
+      }
+    }
+    return true;
+  }
 
   char chr = input[idx++];
 
@@ -208,7 +223,7 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std
     while (idx < input.length() && match_single(pattern, input[idx]) && pattern.n_char != input[idx])
       idx++;
 
-    while (match_single(patterns[++pidx], chr))
+    while (++pidx < patterns.size() && match_single(patterns[pidx], chr))
       idx--;
   }
   return true;
@@ -220,6 +235,8 @@ bool match_group(Pattern pattern, const std::string &input, int &idx, std::vecto
   int pidx = 0;
   for (int i = 0; i < pattern.group.size(); ++i)
   {
+    if (idx >= input.length())
+      return false;
     auto p = pattern.group[i];
     if (!match_curr_pattern(p, input, idx, pattern.group, pidx))
     {
@@ -236,6 +253,7 @@ bool match_group(Pattern pattern, const std::string &input, int &idx, std::vecto
     }
       
   }
+  captures.push_back({input.substr(saved_idx, idx-saved_idx)});
   return true;
 }
 
@@ -266,11 +284,9 @@ bool match_pattern(const std::string &input_line, std::string pattern_text)
     }
     else
     {
-      if (found_beg)
-      {
-        i = last_found_idx + 1;
-        pi = 0;
-      }
+      pi = 0;
+      i = ++last_found_idx;
+
       found_beg = false;
       if (anchor_beg)
         return false;
@@ -316,8 +332,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "I see 1 cat";
-  pattern = "^I see \\d+ (cat|dog)s?$";
+  std::string input_line = "cat is cat, not dog";
+  pattern = "^([act]+) is \\1, not [^xyz]+$";
 #endif
   try
   {
