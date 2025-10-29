@@ -248,12 +248,10 @@ bool match_group(Pattern pattern, const std::string &input, int &idx, std::vecto
     else
     {
       if (p.quantifier == OR)
-        return true;
+        break;
       pidx++;
     }
-      
   }
-  captures.push_back({input.substr(saved_idx, idx-saved_idx)});
   return true;
 }
 
@@ -275,9 +273,14 @@ bool match_pattern(const std::string &input_line, std::string pattern_text)
   int last_found_idx = 0;
   for (; i < input_len && pi < pattern_len;)
   {
+    int saved_idx = i;
     if (match_curr_pattern(patterns[pi], input_line, i, patterns, pi))
     {
-      if (!found_beg)
+      if (patterns[pi].type == GROUP)
+      {
+        captures.push_back({input_line.substr(saved_idx, i-saved_idx)});
+      }
+       if (!found_beg)
         last_found_idx = i;
       found_beg = true;
       pi++;
@@ -332,8 +335,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "cat is cat, not dog";
-  pattern = "^([act]+) is \\1, not [^xyz]+$";
+  std::string input_line = "cat and fish, cat with fish";
+  pattern = "(c.t|d.g) and (f..h|b..d), \\1 with \\2";
 #endif
   try
   {
