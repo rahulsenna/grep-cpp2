@@ -218,10 +218,10 @@ bool match_single(Pattern pattern, char chr)
   }
   return false;
 }
-bool match_group(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns);
-bool n_quantifier(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx);
+bool match_group(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns);
+bool n_quantifier(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx);
 
-bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
+bool match_curr_pattern(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
 {
   if (pattern.quantifier == N_QUANTIFIER)
     return n_quantifier(pattern, input, idx, patterns, pidx);
@@ -268,7 +268,7 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std
   return true;
 }
 
-bool match_group(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns)
+bool match_group(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns)
 {
   int saved_idx = idx;
   int pidx = 0;
@@ -295,7 +295,7 @@ bool match_group(Pattern pattern, const std::string &input, int &idx, std::vecto
   return true;
 }
 
-bool n_quantifier(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
+bool n_quantifier(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
 {
   int saved_idx = idx;
   Pattern dummy = pattern;
@@ -441,8 +441,10 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "blueberry";
-  pattern = ".+berry";
+  // std::string input_line = "blueberry";
+  // pattern = ".+berry";
+  std::string input_line = "apple";
+  pattern = ".+ple";
 #endif
   try
   {
