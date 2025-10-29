@@ -3,6 +3,8 @@
 #include <vector>
 #include <sstream>
 #include <climits>
+#include <filesystem>
+#include <fstream>
 
 enum PatternType
 {
@@ -260,7 +262,7 @@ bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std
     while (idx < input.length() && match_single(pattern, input[idx]) && pattern.n_char != input[idx])
       idx++;
 
-    while (++pidx < patterns.size() && match_single(patterns[pidx], chr))
+    while (pattern.type != WILDCARD && ++pidx < patterns.size() && match_single(patterns[pidx], chr))
       idx--;
   }
   return true;
@@ -369,31 +371,78 @@ int main(int argc, char *argv[])
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
 
-  // You can use print statements as follows for debugging, they'll be visible when running tests.
-  std::cerr << "Logs from your program will appear here" << std::endl;
 
-  if (argc != 3)
+  if (argc < 3)
   {
-    std::cerr << "Expected two arguments" << std::endl;
+    std::cerr << "Expected at least two arguments" << std::endl;
     return 1;
   }
 
   std::string flag = argv[1];
   std::string pattern = argv[2];
 
-  if (flag != "-E")
+  bool recursive = false;
+  std::string directory;
+  if (flag == "-r")
   {
-    std::cerr << "Expected first argument to be '-E'" << std::endl;
-    return 1;
+    recursive = true;
+    flag = argv[2];
+    pattern = argv[3];
+    directory = argv[4];
   }
 
+  std::vector<std::string> paths;
+
+  if (recursive)
+  {
+    for (auto &entry : std::filesystem::recursive_directory_iterator(directory))
+    {
+      if (entry.is_regular_file())
+        paths.push_back(entry.path());
+    }
+  }
+  else
+  {
+    for (int i = 3; i < argc; ++i)
+    {
+      std::string path = argv[i];
+      paths.push_back(path);
+    }
+  }
+
+  if (not paths.empty())
+  {
+    int res = 1;
+    for (auto filename : paths)
+    {
+      std::ifstream file(filename);
+      if (not file.is_open())
+        std::cerr << " Failed to open file " << '\n';
+
+      std::string prefix = "";
+      if (paths.size() > 1)
+        prefix = filename + ':';
+
+      std::string input_line;
+
+      while (std::getline(file, input_line))
+      {
+        if (match_pattern(input_line, pattern))
+        {
+          std::cout << prefix << input_line << '\n';
+          res = 0;
+        }
+      }
+    }
+    return res;
+  }
 
 #if 1 // DEBUG
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "tomatooooo";
-  pattern = "tomatoo{2,5}";
+  std::string input_line = "blueberry";
+  pattern = ".+berry";
 #endif
   try
   {
