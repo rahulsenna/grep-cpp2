@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <climits>
 
 enum PatternType
 {
@@ -11,6 +12,7 @@ enum PatternType
   W_CHAR,
   PLUS,
   STAR,
+  N_QUANTIFIER,
   OPTIONAL,
   OR,
   CHAR_GROUP_POSITIVE,
@@ -32,6 +34,8 @@ typedef struct Pattern
   std::vector<Pattern> group;
   std::string char_group;
   int cap_group;
+  int min_quant;
+  int max_quant;
 } Pattern;
 int cap_group_cnt = 0;
 Pattern parse_single_pattern(std::string pattern, int &idx)
@@ -147,6 +151,23 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
     case '*': result.quantifier = STAR;     idx++; result.n_char = pattern[idx+1];  break;
     case '?': result.quantifier = OPTIONAL; idx++; result.n_char = pattern[idx+1];  break;
     case '|': result.quantifier = OR;       idx++; result.n_char = pattern[idx+1];  break;
+    case '{': 
+    {
+      result.quantifier = N_QUANTIFIER;
+      idx+=2;
+      result.min_quant = pattern[idx] - '0';
+      result.max_quant = pattern[idx] - '0';
+      idx++;
+      if (pattern[idx] == ',')
+      {
+        idx++;
+        if (pattern[idx] == '}')
+          result.max_quant = INT_MAX;
+        else
+          result.max_quant = pattern[idx] - '0';
+      }
+      result.n_char = (idx + 2) < pattern.length() ? pattern[idx + 2] : 0;
+    }
     default: break;
   }
 
@@ -193,9 +214,13 @@ bool match_single(Pattern pattern, char chr)
   return false;
 }
 bool match_group(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns);
+bool n_quantifier(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx);
 
 bool match_curr_pattern(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
 {
+  if (pattern.quantifier == N_QUANTIFIER)
+    return n_quantifier(pattern, input, idx, patterns, pidx);
+
   if (pattern.type == GROUP)
     return match_group(pattern, input, idx, patterns);
   
@@ -262,6 +287,28 @@ bool match_group(Pattern pattern, const std::string &input, int &idx, std::vecto
     }
   }
   captures[pattern.cap_group] = input.substr(saved_idx, idx - saved_idx);
+  return true;
+}
+
+bool n_quantifier(Pattern pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
+{
+  int saved_idx = idx;
+  Pattern dummy = pattern;
+  dummy.quantifier = NONE;
+
+  int matched_times = 0;
+  while (idx < input.length() && matched_times < pattern.max_quant)
+  {
+    if (match_curr_pattern(dummy, input, idx, pattern.group, pidx))
+    {
+      matched_times++;
+    }
+  }
+  if (matched_times < pattern.min_quant)
+  {
+    idx = saved_idx;
+    return false;
+  }
   return true;
 }
 
@@ -342,8 +389,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "abc-def is abc-def, not efg, abc, or def";
-  pattern = "(([abc]+)-([def]+)) is \\1, not ([^xyz]+), \\2, or \\3";
+  std::string input_line = "2021-10-24 11:27 blueberry";
+  pattern = "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} (blueberry|spinach)$";
 #endif
   try
   {
