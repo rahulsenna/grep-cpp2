@@ -31,8 +31,9 @@ typedef struct Pattern
 	char n_char;
   std::vector<Pattern> group;
   std::string char_group;
+  int cap_group;
 } Pattern;
-
+int cap_group_cnt = 0;
 Pattern parse_single_pattern(std::string pattern, int &idx)
 {
   Pattern result = {};
@@ -102,6 +103,8 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
       idx++;
       std::vector<Pattern> group;
       bool alt = false;
+      result.cap_group = ++cap_group_cnt;
+
       while (pattern[idx] != ')')
       {
         auto pat = parse_single_pattern(pattern, idx);
@@ -113,11 +116,11 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
           alternate.type = GROUP;
           alternate.quantifier = OR;
           alternate.group = group;
+          alternate.cap_group = cap_group_cnt;
           result.group.push_back(alternate);
           group = {};
         }
       }
-      // idx++; // move past ')'
       if (alt)
       {
         Pattern alternate = {};
@@ -146,6 +149,12 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
     case '|': result.quantifier = OR;       idx++; result.n_char = pattern[idx+1];  break;
     default: break;
   }
+
+  // moving past ')' for next_char
+  int ni = idx + 1;
+  while (ni < pattern.length() && result.n_char == ')')
+    result.n_char = pattern[++ni];
+
   if (result.quantifier == PLUS || result.quantifier == STAR)
   {
     int i = 2;
@@ -167,7 +176,7 @@ std::vector<Pattern> parse_whole_pattern(std::string pattern)
   return res;
 }
 
-std::vector<std::string> captures {""};
+std::vector<std::string> captures;
 
 bool match_single(Pattern pattern, char chr)
 {
@@ -252,10 +261,11 @@ bool match_group(Pattern pattern, const std::string &input, int &idx, std::vecto
       pidx++;
     }
   }
+  captures[pattern.cap_group] = input.substr(saved_idx, idx - saved_idx);
   return true;
 }
 
-bool match_pattern(const std::string &input_line, std::string pattern_text)
+bool match_pattern(const std::string &input, std::string pattern_text)
 {
   bool anchor_beg = false;
   bool found_beg = false;
@@ -267,19 +277,16 @@ bool match_pattern(const std::string &input_line, std::string pattern_text)
   }
 
   auto patterns = parse_whole_pattern(pattern_text);
+  captures.assign(cap_group_cnt + 1, "");
+  
   int pattern_len = patterns.size();
-  int input_len = input_line.size();
+  int input_len = input.size();
   int i = 0, pi = 0;
   int last_found_idx = 0;
   for (; i < input_len && pi < pattern_len;)
   {
-    int saved_idx = i;
-    if (match_curr_pattern(patterns[pi], input_line, i, patterns, pi))
+    if (match_curr_pattern(patterns[pi], input, i, patterns, pi))
     {
-      if (patterns[pi].type == GROUP)
-      {
-        captures.push_back({input_line.substr(saved_idx, i-saved_idx)});
-      }
        if (!found_beg)
         last_found_idx = i;
       found_beg = true;
@@ -335,8 +342,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "cat and fish, cat with fish";
-  pattern = "(c.t|d.g) and (f..h|b..d), \\1 with \\2";
+  std::string input_line = "abc-def is abc-def, not efg, abc, or def";
+  pattern = "(([abc]+)-([def]+)) is \\1, not ([^xyz]+), \\2, or \\3";
 #endif
   try
   {
