@@ -164,7 +164,10 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
         if (pattern[idx] == '}')
           result.max_quant = INT_MAX;
         else
+        {
           result.max_quant = pattern[idx] - '0';
+          idx++;
+        }
       }
       result.n_char = (idx + 1) < pattern.length() ? pattern[idx + 1] : 0;
     }
@@ -389,8 +392,8 @@ int main(int argc, char *argv[])
   std::string input_line;
   std::getline(std::cin, input_line);
 #else
-  std::string input_line = "13:29 LOG WARN device_registered";
-  pattern = "^\\d{2}:\\d{2} LOG \\w{3,} \\w+$";
+  std::string input_line = "tomatooooo";
+  pattern = "tomatoo{2,5}";
 #endif
   try
   {
