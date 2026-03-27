@@ -8,7 +8,6 @@
 
 enum PatternType
 {
-
   CHAR = 0x0,
   DIGIT,
   W_CHAR,
@@ -30,9 +29,9 @@ typedef struct Pattern
 {
   PatternType type;
   PatternType quantifier;
-	char c_char;
-	char p_char;
-	char n_char;
+  char c_char;
+  char p_char;
+  char n_char;
   std::vector<Pattern> group;
   std::string char_group;
   int cap_group;
@@ -40,7 +39,7 @@ typedef struct Pattern
   int max_quant;
 } Pattern;
 int cap_group_cnt = 0;
-Pattern parse_single_pattern(std::string pattern, int &idx)
+Pattern parse_single_pattern(std::string pattern, int& idx)
 {
   Pattern result = {};
   result.type = CHAR;
@@ -55,20 +54,20 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
 
   switch (result.c_char)
   {
-    case '\\': 
+    case '\\':
     {
       idx++;
       switch (pattern[idx])
       {
-      case 'd': result.type = DIGIT; break;
-      case 'w': result.type = W_CHAR; break;
-      default:
-        if (isdigit(pattern[idx]))
-        {
-          result.type = BACK_REF;
-          result.c_char = pattern[idx] - '0';
-        }
-      break;
+        case 'd': result.type = DIGIT; break;
+        case 'w': result.type = W_CHAR; break;
+        default:
+          if (isdigit(pattern[idx]))
+          {
+            result.type = BACK_REF;
+            result.c_char = pattern[idx] - '0';
+          }
+          break;
       }
       result.n_char = pattern[idx + 1];
       break;
@@ -78,18 +77,18 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
       result.type = CHAR_GROUP_POSITIVE;
       idx++;
       if (pattern[idx] == '^')
-      { 
-      	result.type = CHAR_GROUP_NEGATIVE;
+      {
+        result.type = CHAR_GROUP_NEGATIVE;
         idx++;
       }
       std::ostringstream ss;
       char prev = 0;
-      while(pattern[idx] != ']')
+      while (pattern[idx] != ']')
       {
         if (pattern[idx] == '-' && prev != 0)
         {
           idx++;
-          while(prev < pattern[idx])
+          while (prev < pattern[idx])
           {
             ss << prev;
             prev++;
@@ -136,7 +135,7 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
         result.group.push_back(alternate);
       } else
       {
-        for (auto e: group)
+        for (auto e : group)
           result.group.push_back(e);
       }
       result.n_char = pattern[idx + 1];
@@ -149,14 +148,14 @@ Pattern parse_single_pattern(std::string pattern, int &idx)
 
   switch (result.n_char)
   {
-    case '+': result.quantifier = PLUS ;    idx++; result.n_char = pattern[idx+1];  break;
-    case '*': result.quantifier = STAR;     idx++; result.n_char = pattern[idx+1];  break;
-    case '?': result.quantifier = OPTIONAL; idx++; result.n_char = pattern[idx+1];  break;
-    case '|': result.quantifier = OR;       idx++; result.n_char = pattern[idx+1];  break;
-    case '{': 
+    case '+': result.quantifier = PLUS;    idx++; result.n_char = pattern[idx + 1];  break;
+    case '*': result.quantifier = STAR;     idx++; result.n_char = pattern[idx + 1];  break;
+    case '?': result.quantifier = OPTIONAL; idx++; result.n_char = pattern[idx + 1];  break;
+    case '|': result.quantifier = OR;       idx++; result.n_char = pattern[idx + 1];  break;
+    case '{':
     {
       result.quantifier = N_QUANTIFIER;
-      idx+=2;
+      idx += 2;
       result.min_quant = pattern[idx] - '0';
       result.max_quant = pattern[idx] - '0';
       idx++;
@@ -206,7 +205,7 @@ std::vector<std::string> captures;
 
 bool match_single(Pattern pattern, char chr)
 {
-  switch(pattern.type)
+  switch (pattern.type)
   {
     case WILDCARD:            return true;
     case CHAR:                return pattern.c_char == chr;
@@ -218,17 +217,17 @@ bool match_single(Pattern pattern, char chr)
   }
   return false;
 }
-bool match_group(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns);
-bool n_quantifier(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx);
+bool match_group(Pattern& pattern, const std::string& input, int& idx, std::vector<Pattern>& patterns);
+bool n_quantifier(Pattern& pattern, const std::string& input, int& idx, std::vector<Pattern>& patterns, int pidx);
 
-bool match_curr_pattern(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
+bool match_curr_pattern(Pattern& pattern, const std::string& input, int& idx, std::vector<Pattern>& patterns, int pidx)
 {
   if (pattern.quantifier == N_QUANTIFIER)
     return n_quantifier(pattern, input, idx, patterns, pidx);
 
   if (pattern.type == GROUP)
     return match_group(pattern, input, idx, patterns);
-  
+
   else if (pattern.type == BACK_REF)
   {
     int capture_group_idx = pattern.c_char;
@@ -252,11 +251,11 @@ bool match_curr_pattern(Pattern &pattern, const std::string &input, int &idx, st
   if (!match_single(pattern, chr))
   {
     if ((pattern.type == CHAR && (pattern.quantifier == STAR || pattern.quantifier == OPTIONAL)))
-    	idx--;
+      idx--;
     else
       return false;
   }
-  
+
   if (pattern.quantifier == STAR || pattern.quantifier == PLUS)
   {
     while (idx < input.length() && match_single(pattern, input[idx]) && pattern.n_char != input[idx])
@@ -268,7 +267,7 @@ bool match_curr_pattern(Pattern &pattern, const std::string &input, int &idx, st
   return true;
 }
 
-bool match_group(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns)
+bool match_group(Pattern& pattern, const std::string& input, int& idx, std::vector<Pattern>& patterns)
 {
   int saved_idx = idx;
   int pidx = 0;
@@ -281,10 +280,9 @@ bool match_group(Pattern &pattern, const std::string &input, int &idx, std::vect
     {
       idx = saved_idx;
       pidx = 0;
-      if (p.quantifier != OR || (i+1) >= pattern.group.size())
+      if (p.quantifier != OR || (i + 1) >= pattern.group.size())
         return false;
-    }
-    else
+    } else
     {
       if (p.quantifier == OR)
         break;
@@ -295,7 +293,7 @@ bool match_group(Pattern &pattern, const std::string &input, int &idx, std::vect
   return true;
 }
 
-bool n_quantifier(Pattern &pattern, const std::string &input, int &idx, std::vector<Pattern> &patterns, int pidx)
+bool n_quantifier(Pattern& pattern, const std::string& input, int& idx, std::vector<Pattern>& patterns, int pidx)
 {
   int saved_idx = idx;
   Pattern dummy = pattern;
@@ -317,7 +315,7 @@ bool n_quantifier(Pattern &pattern, const std::string &input, int &idx, std::vec
   return true;
 }
 
-bool match_pattern(const std::string &input, std::string pattern_text)
+bool match_pattern(const std::string& input, std::string pattern_text)
 {
   bool anchor_beg = false;
   bool found_beg = false;
@@ -330,7 +328,7 @@ bool match_pattern(const std::string &input, std::string pattern_text)
 
   auto patterns = parse_whole_pattern(pattern_text);
   captures.assign(cap_group_cnt + 1, "");
-  
+
   int pattern_len = patterns.size();
   int input_len = input.size();
   int i = 0, pi = 0;
@@ -339,12 +337,11 @@ bool match_pattern(const std::string &input, std::string pattern_text)
   {
     if (match_curr_pattern(patterns[pi], input, i, patterns, pi))
     {
-       if (!found_beg)
+      if (!found_beg)
         last_found_idx = i;
       found_beg = true;
       pi++;
-    }
-    else
+    } else
     {
       pi = 0;
       i = ++last_found_idx;
@@ -365,7 +362,7 @@ bool match_pattern(const std::string &input, std::string pattern_text)
   return found_beg;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
@@ -395,13 +392,12 @@ int main(int argc, char *argv[])
 
   if (recursive)
   {
-    for (auto &entry : std::filesystem::recursive_directory_iterator(directory))
+    for (auto& entry : std::filesystem::recursive_directory_iterator(directory))
     {
       if (entry.is_regular_file())
         paths.push_back(entry.path());
     }
-  }
-  else
+  } else
   {
     for (int i = 3; i < argc; ++i)
     {
@@ -437,29 +433,16 @@ int main(int argc, char *argv[])
     return res;
   }
 
-#if 1 // DEBUG
+  int res = 1;
   std::string input_line;
-  std::getline(std::cin, input_line);
-#else
-  // std::string input_line = "blueberry";
-  // pattern = ".+berry";
-  std::string input_line = "apple";
-  pattern = ".+ple";
-#endif
-  try
+  while (std::getline(std::cin, input_line))
   {
     if (match_pattern(input_line, pattern))
     {
-      return 0;
-    }
-    else
-    {
-      return 1;
+      std::cout << input_line << '\n';
+      res = 0;
     }
   }
-  catch (const std::runtime_error &e)
-  {
-    std::cerr << e.what() << std::endl;
-    return 1;
-  }
+  return res;
+
 }
