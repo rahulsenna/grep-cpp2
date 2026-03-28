@@ -6,6 +6,72 @@
 #include <filesystem>
 #include <fstream>
 
+#include <unistd.h>
+typedef struct
+{
+  int extended;    // -E
+  int perl;        // -P
+  int only_match;  // -o
+  int ignore_case; // -i
+  int line_num;    // -n
+  int invert;      // -v
+  int count;       // -c
+  int recursive;   // -r
+  int follow_links;// -R
+  char* pattern;
+  char** files;
+  int file_count;
+} GrepArgs;
+
+GrepArgs parse_args(int argc, char* argv[])
+{
+  GrepArgs args = { 0 };
+  int opt;
+
+  while ((opt = getopt(argc, argv, "EPoinvcrRe:")) != -1)
+  {
+    switch (opt)
+    {
+      case 'E': args.extended = 1; break;
+      case 'P': args.perl = 1; break;
+      case 'o': args.only_match = 1; break;
+      case 'i': args.ignore_case = 1; break;
+      case 'n': args.line_num = 1; break;
+      case 'v': args.invert = 1; break;
+      case 'c': args.count = 1; break;
+      case 'r': args.recursive = 1; break;
+      case 'R': args.recursive = 1;
+        args.follow_links = 1; break;
+      case 'e': args.pattern = optarg; break;
+      case '?': exit(1);
+    }
+  }
+
+  // no -e
+  if (!args.pattern)
+  {
+    if (optind >= argc)
+    {
+      fprintf(stderr, "grep: missing pattern\n");
+      exit(1);
+    }
+    args.pattern = argv[optind++];
+  }
+
+  args.files = &argv[optind];
+  args.file_count = argc - optind;
+
+  if (args.recursive && args.file_count == 0)
+  {
+    static char* default_path[] = { (char*) "." };
+    args.files = default_path;
+    args.file_count = 1;
+  }
+
+  return args;
+}
+GrepArgs args;
+
 enum PatternType
 {
   CHAR = 0x0,
@@ -315,7 +381,7 @@ bool n_quantifier(Pattern& pattern, const std::string& input, int& idx, std::vec
   return true;
 }
 
-bool match_pattern(const std::string& input, std::string pattern_text)
+bool match_pattern(const std::string& input, std::string pattern_text, std::ostringstream& out)
 {
   bool anchor_beg = false;
   bool found_beg = false;
@@ -335,12 +401,15 @@ bool match_pattern(const std::string& input, std::string pattern_text)
   int last_found_idx = 0;
   for (; i < input_len && pi < pattern_len;)
   {
+    int last_matched_idx = i;
     if (match_curr_pattern(patterns[pi], input, i, patterns, pi))
     {
       if (!found_beg)
         last_found_idx = i;
       found_beg = true;
       pi++;
+      if (args.only_match)
+        out << input.substr(last_matched_idx, i-last_matched_idx);
     } else
     {
       pi = 0;
@@ -348,7 +417,10 @@ bool match_pattern(const std::string& input, std::string pattern_text)
 
       found_beg = false;
       if (anchor_beg)
+      {
+        out.clear();
         return false;
+      }
     }
   }
   while (pi < pattern_len)
@@ -368,44 +440,24 @@ int main(int argc, char* argv[])
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
 
-
-  if (argc < 3)
-  {
-    std::cerr << "Expected at least two arguments" << std::endl;
-    return 1;
-  }
-
-  std::string flag = argv[1];
-  std::string pattern = argv[2];
-
-  bool recursive = false;
-  std::string directory;
-  if (flag == "-r")
-  {
-    recursive = true;
-    flag = argv[2];
-    pattern = argv[3];
-    directory = argv[4];
-  }
+  args = parse_args(argc, argv);
 
   std::vector<std::string> paths;
 
-  if (recursive)
+  if (args.recursive)
   {
-    for (auto& entry : std::filesystem::recursive_directory_iterator(directory))
+    for (auto& entry : std::filesystem::recursive_directory_iterator(args.files[0]))
     {
       if (entry.is_regular_file())
         paths.push_back(entry.path());
     }
-  } else
-  {
-    for (int i = 3; i < argc; ++i)
-    {
-      std::string path = argv[i];
-      paths.push_back(path);
-    }
   }
-
+  for (int i = 0; i < args.file_count; ++i)
+  {
+  	 std::string path = args.files[i];
+      paths.push_back(path);
+  }
+  
   if (not paths.empty())
   {
     int res = 1;
@@ -423,7 +475,8 @@ int main(int argc, char* argv[])
 
       while (std::getline(file, input_line))
       {
-        if (match_pattern(input_line, pattern))
+        std::ostringstream out;
+        if (match_pattern(input_line, args.pattern, out))
         {
           std::cout << prefix << input_line << '\n';
           res = 0;
@@ -437,9 +490,14 @@ int main(int argc, char* argv[])
   std::string input_line;
   while (std::getline(std::cin, input_line))
   {
-    if (match_pattern(input_line, pattern))
+    std::ostringstream out;
+    if (match_pattern(input_line, args.pattern, out))
     {
-      std::cout << input_line << '\n';
+      if (args.only_match)
+        std::cout << out.str() << '\n';
+      else
+        std::cout << input_line << '\n';
+
       res = 0;
     }
   }
