@@ -7,6 +7,19 @@
 #include <fstream>
 
 #include <unistd.h>
+#include <getopt.h>
+
+#define COL_RESET  "\033[0m"
+#define COL_MATCH  "\033[01;31m" // bold red
+#define COL_FILE   "\033[35m"    // magenta
+#define COL_LNUM   "\033[32m"    // green
+#define COL_SEP    "\033[36m"    // cyan
+
+std::string BEG = "";
+std::string END = "";
+
+typedef enum { COLOR_AUTO, COLOR_ALWAYS, COLOR_NEVER } ColorMode;
+
 typedef struct
 {
   int extended;    // -E
@@ -21,14 +34,23 @@ typedef struct
   char* pattern;
   char** files;
   int file_count;
+  ColorMode color;
 } GrepArgs;
 
 GrepArgs parse_args(int argc, char* argv[])
 {
   GrepArgs args = { 0 };
+  args.color = COLOR_AUTO;
   int opt;
 
-  while ((opt = getopt(argc, argv, "EPoinvcrRe:")) != -1)
+  static const struct option long_opts[] = {
+        { "extended-regexp",        no_argument,       NULL, 'E' },
+        { "color",                  optional_argument, NULL,  1  },
+        { "colour",                 optional_argument, NULL,  1  },
+        { NULL, 0, NULL, 0 }
+  };
+
+  while ((opt = getopt_long(argc, argv, "EPoinvcrRe:", long_opts, NULL)) != -1)
   {
     switch (opt)
     {
@@ -43,6 +65,17 @@ GrepArgs parse_args(int argc, char* argv[])
       case 'R': args.recursive = 1;
         args.follow_links = 1; break;
       case 'e': args.pattern = optarg; break;
+      case 1:   /* --color / --colour */
+        if (!optarg)                        args.color = COLOR_ALWAYS;
+        else if (std::string_view(optarg) == "always") args.color = COLOR_ALWAYS;
+        else if (std::string_view(optarg) == "never")  args.color = COLOR_NEVER;
+        else if (std::string_view(optarg) == "auto")   args.color = COLOR_AUTO;
+        else
+        {
+          fprintf(stderr, "grep: invalid --color argument: %s\n", optarg);
+          exit(1);
+        }
+            break;
       case '?': exit(1);
     }
   }
@@ -408,12 +441,15 @@ bool match_pattern(std::string& input, std::string pattern_text, std::ostringstr
         last_found_idx = i;
       found_beg = true;
       pi++;
-      if (args.only_match)
-        out << input.substr(last_matched_idx, i-last_matched_idx);
+      out << BEG << input.substr(last_matched_idx, i - last_matched_idx) << END;
+      // if (args.only_match)
+        // out << '\n';
     } else
     {
       pi = 0;
       i = ++last_found_idx;
+      if (not args.only_match)
+        out << input[i - 1];
 
       found_beg = false;
       if (anchor_beg)
@@ -442,6 +478,12 @@ int main(int argc, char* argv[])
   std::cerr << std::unitbuf;
 
   args = parse_args(argc, argv);
+
+  if (args.color == COLOR_ALWAYS)
+  {
+    BEG = COL_MATCH;
+    END = COL_RESET;
+  }
 
   std::vector<std::string> paths;
 
@@ -489,24 +531,43 @@ int main(int argc, char* argv[])
 
   int res = 1;
   std::string input_line;
+  const bool anchored = args.pattern && args.pattern[0] == '^';
   while (std::getline(std::cin, input_line))
   {
-    std::string this_line = input_line;
     std::ostringstream out;
-    if (match_pattern(this_line, args.pattern, out))
-    {
-      if (args.only_match)
-      {
-        do
-        {
-          std::cout << out.str() << '\n';
-          out.str("");
-        } while (this_line.length() > 0 && match_pattern(this_line, args.pattern, out));
-      }
-      else
-        std::cout << input_line << '\n';
+    std::string remaining = input_line;
 
-      res = 0;
+    if (anchored)
+    {
+      if (match_pattern(remaining, args.pattern, out))
+      {
+        res = 0;
+        std::cout << out.str();
+        if (!args.only_match)
+          std::cout << remaining << '\n';
+      }
+      continue;
+    }
+  
+    bool did_find = false;
+    for (bool matched = false; (matched = match_pattern(remaining, args.pattern, out)) || !remaining.empty(); )
+    {
+      if (matched)
+      {
+        did_find = true;
+        res = 0;
+      }
+      std::cout << out.str();
+      out.str("");
+      if (args.only_match)
+        std::cout << '\n';
+    }
+
+    if (did_find)
+    {
+      std::cout << out.str();
+      if (!args.only_match)
+        std::cout << '\n';
     }
   }
   return res;
