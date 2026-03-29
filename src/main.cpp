@@ -381,7 +381,7 @@ bool n_quantifier(Pattern& pattern, const std::string& input, int& idx, std::vec
   return true;
 }
 
-bool match_pattern(const std::string& input, std::string pattern_text, std::ostringstream& out)
+bool match_pattern(std::string& input, std::string pattern_text, std::ostringstream& out)
 {
   bool anchor_beg = false;
   bool found_beg = false;
@@ -418,11 +418,12 @@ bool match_pattern(const std::string& input, std::string pattern_text, std::ostr
       found_beg = false;
       if (anchor_beg)
       {
-        out.clear();
+        out.str("");
         return false;
       }
     }
   }
+  input = input.substr(i, input.size() - i);
   while (pi < pattern_len)
   {
     if (patterns[pi].c_char == '$' && i == input_len)
@@ -490,11 +491,18 @@ int main(int argc, char* argv[])
   std::string input_line;
   while (std::getline(std::cin, input_line))
   {
+    std::string this_line = input_line;
     std::ostringstream out;
-    if (match_pattern(input_line, args.pattern, out))
+    if (match_pattern(this_line, args.pattern, out))
     {
       if (args.only_match)
-        std::cout << out.str() << '\n';
+      {
+        do
+        {
+          std::cout << out.str() << '\n';
+          out.str("");
+        } while (this_line.length() > 0 && match_pattern(this_line, args.pattern, out));
+      }
       else
         std::cout << input_line << '\n';
 
