@@ -416,14 +416,9 @@ bool n_quantifier(Pattern& pattern, const std::string& input, int& idx, std::vec
 
 bool match_pattern(std::string& input, std::string pattern_text, std::ostringstream& out)
 {
-  bool anchor_beg = false;
-  bool found_beg = false;
-  if (pattern_text[0] == '^')
-  {
-    found_beg = true;
-    anchor_beg = true;
-    pattern_text = pattern_text.substr(1);
-  }
+  const bool anchored = !pattern_text.empty() && pattern_text[0] == '^';
+  if (anchored)
+    pattern_text.erase(0, 1);
 
   auto patterns = parse_whole_pattern(pattern_text);
   captures.assign(cap_group_cnt + 1, "");
@@ -431,44 +426,53 @@ bool match_pattern(std::string& input, std::string pattern_text, std::ostringstr
   int pattern_len = patterns.size();
   int input_len = input.size();
   int i = 0, pi = 0;
-  int last_found_idx = 0;
+  int scan_start = 0;
+  int match_at = -1;
   for (; i < input_len && pi < pattern_len;)
   {
-    int last_matched_idx = i;
+    const int piece_start = i;
     if (match_curr_pattern(patterns[pi], input, i, patterns, pi))
     {
-      if (!found_beg)
-        last_found_idx = i;
-      found_beg = true;
+      if (match_at < 0)
+        match_at = piece_start;
       pi++;
-      out << BEG << input.substr(last_matched_idx, i - last_matched_idx) << END;
-      // if (args.only_match)
-        // out << '\n';
-    } else
-    {
-      pi = 0;
-      i = ++last_found_idx;
-      if (not args.only_match)
-        out << input[i - 1];
-
-      found_beg = false;
-      if (anchor_beg)
-      {
-        out.str("");
-        return false;
-      }
+      continue;
     }
+
+    if (anchored) { out.str(""); return false; }
+
+    if (!args.only_match)
+      out << input[scan_start];
+    i = ++scan_start;
+    pi = 0;
+    match_at = -1;
   }
-  input = input.substr(i, input.size() - i);
+
+  if (match_at < 0)
+  {
+    input.erase(0, i);
+    return false;
+  }
+
+  bool matched = true;
+
   while (pi < pattern_len)
   {
     if (patterns[pi].c_char == '$' && i == input_len)
-      return found_beg;
+      break;
     if (!(patterns[pi].quantifier == STAR || patterns[pi].quantifier == OPTIONAL))
-      return false;
+    {
+      matched = false; break;
+    }
     pi++;
   }
-  return found_beg;
+
+  if (matched) out << BEG;
+  out << input.substr(match_at, i - match_at);
+  if (matched) out << END;
+
+  input.erase(0, i);
+  return matched;
 }
 
 int main(int argc, char* argv[])
