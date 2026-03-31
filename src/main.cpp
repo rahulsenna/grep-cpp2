@@ -483,7 +483,7 @@ int main(int argc, char* argv[])
 
   args = parse_args(argc, argv);
 
-  if (args.color == COLOR_ALWAYS)
+  if (args.color == COLOR_ALWAYS or (args.color == COLOR_AUTO and isatty(STDOUT_FILENO)))
   {
     BEG = COL_MATCH;
     END = COL_RESET;
